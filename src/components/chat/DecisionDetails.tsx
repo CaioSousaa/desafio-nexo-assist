@@ -17,7 +17,7 @@ export function DecisionDetails({ decision }: { decision: Decision }) {
   const entities = Object.entries(decision.understanding.entities);
   const fromTemplate = decision.source === "template";
   const confidenceTone = decision.confidence >= 80 ? "bg-success" : decision.confidence >= 60 ? "bg-warning" : "bg-danger";
-  const articles = decision.steps.map((s) => s.articleTitle).filter(Boolean);
+  const searches = decision.steps.filter((s) => s.tool === "search_help_center" && s.outputSummary);
   return (
     <div className="w-full rounded-[12px] bg-desk p-4 text-[13.5px] text-ink outline outline-1 -outline-offset-1 outline-rule" role="region" aria-label="Detalhe da decisão do agent">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -38,7 +38,11 @@ export function DecisionDetails({ decision }: { decision: Decision }) {
         </Section>
         <Section title="Decidi">
           <p className="font-medium">{actionLabel(decision.action)}</p>
-          {articles.length > 0 && <p className="text-[12.5px] text-ink-3">Artigo usado: {articles.join(", ")}</p>}
+          {searches.map((s) => (
+            <p key={s.id} className="text-[12.5px] text-ink-3">
+              Central de ajuda: {s.outputSummary}
+            </p>
+          ))}
         </Section>
         <Section title="Confiança">
           <div className="flex items-center gap-3">

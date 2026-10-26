@@ -82,7 +82,7 @@ Cada mensagem vira um turno (`src/server/agent/run-turn.ts`):
 
 ### Testes automatizados (`npm test`)
 
-234 testes em Vitest, sem chamar o modelo. Os testes de integração usam bancos SQLite temporários com as migrations reais; os do turno usam o `Agent` do Mastra de verdade com um **modelo roteirizado** (`src/test/scripted-model.ts`), então ferramentas, `RequestContext`, streaming e pós-ações são exercitados de ponta a ponta.
+235 testes em Vitest, sem chamar o modelo. Os testes de integração usam bancos SQLite temporários com as migrations reais; os do turno usam o `Agent` do Mastra de verdade com um **modelo roteirizado** (`src/test/scripted-model.ts`), então ferramentas, `RequestContext`, streaming e pós-ações são exercitados de ponta a ponta.
 
 | Suíte | O que cobre |
 |-------|-------------|

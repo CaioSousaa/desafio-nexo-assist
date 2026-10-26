@@ -167,6 +167,48 @@ describe("turno do agent (Mastra + ferramentas + banco, modelo roteirizado)", ()
     }
   });
 
+  it("rascunho criado num turno abortado aparece na resposta do 'Tentar de novo'", async () => {
+    const slow = await createTestApp({ config: { turnTimeoutMs: 400 } });
+    try {
+      slow.model.push(
+        {
+          tools: [
+            call("propose_draft", {
+              kind: "novo",
+              title: "Impressora do 3º andar com erro de bandeja",
+              description: "A impressora do 3º andar não imprime; erro de bandeja. Afeta a equipe.",
+              type: "INC",
+              category: "Hardware",
+              affected: "equipe",
+              classification: { blocksWork: false, sameDayCommitment: false, hasWorkaround: true },
+              duplicateCheck: { considered: [], verdict: "nenhum", why: "sem chamado de impressora" },
+            }),
+          ],
+        },
+        (_prompt, signal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+          }),
+      );
+      const ana = await slow.user(ANA);
+      const accepted = await acceptEmployeeMessage(slow.ctx, ana, { text: "Minha equipe", clientMessageId: clientId() });
+      await accepted.run?.();
+      const pending = await findPendingDraft(slow.ctx.db, accepted.conversation.id);
+      expect(pending).not.toBeNull();
+      expect((await listMessages(slow.ctx.db, accepted.conversation.id)).find((m) => m.id === accepted.agentMessage!.id)?.status).toBe("error");
+
+      slow.model.push({ tools: [call("list_my_tickets", {}), decision({ action: "propor_chamado" })] }, { text: "" });
+      const retry = await retryAgentMessage(slow.ctx, ana, accepted.agentMessage!.id);
+      await retry.run();
+      const reply = (await listMessages(slow.ctx.db, accepted.conversation.id)).find((m) => m.id === accepted.agentMessage!.id)!;
+      expect(reply.status).toBe("done");
+      expect(reply.parts.draft_id).toBe(pending!.id);
+      expect(reply.text).toMatch(/Montei o rascunho/);
+    } finally {
+      slow.close();
+    }
+  });
+
   it("com a conversa aguardando atendente o agent não responde; a mensagem fica registrada (FR-042)", async () => {
     app.model.push({ tools: [call("request_transfer", { reason: "pedido", summary: { problem: "Quer analista", done: "nada", tickets: [] } }), decision({ action: "transferir" })] }, { text: "Vou chamar um analista." });
     const first = await send("quero falar com um analista");

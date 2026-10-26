@@ -223,6 +223,13 @@ export async function runAgentTurn(
     });
     log.info("decision_recorded", { action: decision.action, confidence: decision.confidence, source });
 
+    // Rascunho pendente que não aparece em nenhuma mensagem (ex.: criado num turno abortado antes do
+    // "Tentar de novo") é anexado a esta resposta para o funcionário conseguir confirmar.
+    if (!scratch.draftId) {
+      const pending = await findPendingDraft(ctx.db, conversation.id);
+      const shown = new Set(messages.map((m) => m.parts.draft_id).filter(Boolean));
+      if (pending && !shown.has(pending.id)) scratch.draftId = pending.id;
+    }
     const text = result.text || fallbackText(scratch);
     if (!result.text) log.warn("empty_text");
     const finalMessage = await updateMessage(ctx.db, input.agentMessageId, {
