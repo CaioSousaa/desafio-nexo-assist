@@ -41,7 +41,7 @@ Sem achados CRÍTICOS ou ALTOS: cobertura FR → desenho → teste fechada (57/5
   - Verificação: `npm run typecheck && npm run lint && npm run build`
 - [ ] T003 [P] Validar variáveis de ambiente e publicar o `.env.example`
   - Arquivos: `src/env.ts` (criar: zod sobre `process.env`; `GEMINI_API_KEY` obrigatória, `GEMINI_MODEL` padrão `gemini-3.5-flash-lite`, `SESSION_SECRET` obrigatória, `AGENT_CONFIDENCE_THRESHOLD` 60, `AGENT_MESSAGE_LIMIT` 30, `TICKETS_OUTAGE_RATE` 0.1, `TICKETS_OUTAGE_SECONDS` 4, `APP_DB_PATH` `./data/app.db`, `TICKETS_DB_PATH` `./data/tickets.db`, `EVAL_DELAY_MS` 4000; erro legível listando a variável faltante), `.env.example` (criar com exatamente essas chaves e valores padrão, sem segredo)
-  - Padrão a imitar: `tech-spec.md` § Arquivos (`.env.example`); `/home/caio/Documentos/dev/sendEmailJobs/backend/src/config/env.validation.ts` (mesmos nomes `GEMINI_API_KEY`/`GEMINI_MODEL`)
+  - Padrão a imitar: `tech-spec.md` § Arquivos (`.env.example`); projeto anterior do autor (validação de env) (mesmos nomes `GEMINI_API_KEY`/`GEMINI_MODEL`)
   - Cobre: RN-011, SC-007
   - Verificação: `GEMINI_API_KEY=x SESSION_SECRET=y npx tsx -e "import('./src/env.ts').then(m=>console.log(m.env.GEMINI_MODEL))"` imprime `gemini-3.5-flash-lite`; sem `GEMINI_API_KEY` falha citando o nome
 - [ ] T004 [P] Criar o logger JSON do servidor
