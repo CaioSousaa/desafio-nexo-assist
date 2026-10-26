@@ -2,6 +2,17 @@
 
 Agent de atendimento do service desk de TI da Nexo. O funcionário conversa em linguagem natural; o Nexo Assist consulta os chamados dele, busca na central de ajuda, monta rascunhos de chamado que só são gravados depois de "Confirmar", transfere para um analista quando precisa e mostra, em cada resposta, o que fez e por quê. O analista tem um console para ver as conversas, assumir, responder, devolver ao agent e encerrar.
 
+## Como este projeto foi construído: Spec Driven Design com IA
+
+Trabalhei com IA usando **Spec Driven Design**: nenhuma linha de código foi escrita antes de existir uma especificação aprovada, e cada etapa só começou depois que a anterior estava fechada. Meu papel foi o de **arquiteto**: a IA pesquisava, propunha alternativas e escrevia; eu decidia, cortava escopo e corrigia quando ela errava. Os três documentos estão em [`docs/`](docs/) e foram versionados junto com o código.
+
+1. **PRD** ([`docs/prd.md`](docs/prd.md)). Partiu do PDF do desafio e do protótipo no Pencil (6 telas). A IA cruzou as duas fontes e listou 20 incongruências entre elas (por exemplo: o Anexo A diz que chamado vencido *transfere*, o protótipo mostra o agent *oferecendo* um analista). Cada incongruência virou uma pergunta, e eu tomei as decisões D1 a D9: o analista entra pelo mesmo login; "sessão" no limite de 30 mensagens é a conversa; o detalhe da decisão abre logo abaixo da resposta; vencido é oferecido, e pedido, crítico e baixa confiança transferem sozinhos; caso crítico segue rascunho → confirmar → criar → transferir; editar o rascunho é pela conversa; deploy fica fora desta iteração. O resultado são 12 histórias, 57 requisitos funcionais testáveis e critérios de sucesso mensuráveis.
+2. **Tech Spec** ([`docs/tech-spec.md`](docs/tech-spec.md)). A IA pesquisou o ambiente, as versões das bibliotecas e a documentação do Mastra e do Next.js 16, e apresentou alternativas com prós e contras para cada escolha de arquitetura. Decidi T1 a T8, e em dois pontos não segui a recomendação dela: escolhi o **Gemini 3.5 Flash-Lite**, que tem free tier e para o qual eu já tinha chave, em vez do modelo pago sugerido (T2); e escolhi o **serviço de chamados como módulo com banco próprio** atrás de um contrato, em vez de um processo HTTP separado (T4), para o avaliador rodar tudo com um comando. A spec liga cada requisito ao arquivo que o implementa e ao teste que o prova.
+3. **Tasks** ([`docs/tasks.md`](docs/tasks.md)). As tarefas foram quebradas por história, com testes antes do código e um plano de commits por fase. A análise cruzada entre PRD e spec encontrou 6 furos antes da implementação (um comando citado no README que não existia, uma dica no prompt sem origem no contrato da API, pós-ações que não reliam o estado da conversa, limite checado em um ponto só…), e cada um ganhou uma resolução registrada.
+4. **Implementação e verificação**. A IA executou as tarefas na ordem. Pedi ênfase em suítes de testes; o resultado está na seção [Qualidade](#qualidade). No teste manual no navegador, com o modelo real, apareceu um erro que os testes não pegavam: quando a API do Gemini demorava, o tempo limite abortava a resposta, o turno era tratado como "decisão não registrada" e a conversa ia para um analista com confiança 0. Fizemos a correção, com testes de regressão: aborto vira erro com "Tentar de novo", o tempo limite é configurável e o turno gasta uma ida a menos ao modelo.
+
+O que a especificação garantiu na prática: as regras de negócio (prioridade, prazo, confirmação antes de gravar, privacidade, limite) ficaram em código testável e não só no prompt, e qualquer mudança de comportamento tem um requisito, uma decisão ou um achado registrado que a justifica.
+
 ## Como rodar
 
 Requisitos: Node 22 ou mais novo (testado no 24) e uma chave gratuita do [Google AI Studio](https://aistudio.google.com/apikey).
@@ -71,7 +82,7 @@ Cada mensagem vira um turno (`src/server/agent/run-turn.ts`):
 
 ### Testes automatizados (`npm test`)
 
-230 testes em Vitest, sem chamar o modelo. Os testes de integração usam bancos SQLite temporários com as migrations reais; os do turno usam o `Agent` do Mastra de verdade com um **modelo roteirizado** (`src/test/scripted-model.ts`), então ferramentas, `RequestContext`, streaming e pós-ações são exercitados de ponta a ponta.
+234 testes em Vitest, sem chamar o modelo. Os testes de integração usam bancos SQLite temporários com as migrations reais; os do turno usam o `Agent` do Mastra de verdade com um **modelo roteirizado** (`src/test/scripted-model.ts`), então ferramentas, `RequestContext`, streaming e pós-ações são exercitados de ponta a ponta.
 
 | Suíte | O que cobre |
 |-------|-------------|
@@ -125,7 +136,7 @@ Cada resposta grava tokens e custo estimado (tabela paga: US$ 0,30 entrada / US$
 ## Resetar dados e desfazer
 
 - `npm run db:reset` apaga `data/app.db` e `data/tickets.db`, migra e recarrega os dados de exemplo (`-- --keep-tickets` mantém os chamados).
-- `TICKETS_OUTAGE_RATE=0` desliga a indisponibilidade simulada; `AGENT_CONFIDENCE_THRESHOLD` muda o limiar da transferência por baixa confiança; `AGENT_MESSAGE_LIMIT` muda o limite por conversa.
+- `TICKETS_OUTAGE_RATE=0` desliga a indisponibilidade simulada; `AGENT_CONFIDENCE_THRESHOLD` muda o limiar da transferência por baixa confiança; `AGENT_MESSAGE_LIMIT` muda o limite por conversa; `AGENT_TURN_TIMEOUT_MS` (padrão 90 s) é o tempo máximo de uma resposta antes de virar "Tentar de novo".
 
 ## O que eu faria com mais tempo
 
