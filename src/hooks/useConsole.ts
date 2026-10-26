@@ -105,6 +105,16 @@ export function useConsole(initialList: ConsoleList, initialSelected: string | n
     window.history.replaceState(null, "", url);
   }, [selectedId]);
 
+  // Reserva para quando o SSE não entrega (deploy serverless com mais de uma instância).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadList();
+      void loadConversation();
+    }, 8_000);
+    return () => clearInterval(timer);
+  }, [loadList, loadConversation]);
+
   useEffect(() => () => {
     if (listTimer.current) clearTimeout(listTimer.current);
     if (convTimer.current) clearTimeout(convTimer.current);

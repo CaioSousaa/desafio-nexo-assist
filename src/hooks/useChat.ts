@@ -68,6 +68,14 @@ export function useChat(initial: ChatSnapshot) {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
   }, []);
 
+  // Reserva para quando o SSE não entrega (ex.: deploy serverless com mais de uma instância).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 8_000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
   const applyMessage = useCallback(
     (conversationId: string, message: MessageView) => {
       let known = true;

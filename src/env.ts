@@ -35,8 +35,15 @@ export const envSchema = z.object({
   AGENT_TURN_TIMEOUT_MS: numberFromEnv(90_000).pipe(z.number().int().min(1_000)),
   TICKETS_OUTAGE_RATE: numberFromEnv(0.1).pipe(z.number().min(0).max(1)),
   TICKETS_OUTAGE_SECONDS: numberFromEnv(4).pipe(z.number().min(0)),
-  APP_DB_PATH: textWithDefault("./data/app.db"),
-  TICKETS_DB_PATH: textWithDefault("./data/tickets.db"),
+  // Na Vercel só /tmp aceita escrita: modo demo, banco recriado a cada instância nova.
+  APP_DB_PATH: textWithDefault(process.env.VERCEL ? "/tmp/nexo/app.db" : "./data/app.db"),
+  TICKETS_DB_PATH: textWithDefault(process.env.VERCEL ? "/tmp/nexo/tickets.db" : "./data/tickets.db"),
+  /** Mensagens ao agent por IP a cada 10 minutos (0 desliga). */
+  RATE_LIMIT_MESSAGES_PER_IP: numberFromEnv(30).pipe(z.number().int().min(0)),
+  /** Tentativas de login por IP por minuto (0 desliga). */
+  RATE_LIMIT_LOGINS_PER_IP: numberFromEnv(10).pipe(z.number().int().min(0)),
+  /** Teto de turnos do agent por dia (protege a cota da chave; 0 desliga). */
+  DAILY_TURN_LIMIT: numberFromEnv(500).pipe(z.number().int().min(0)),
   EVAL_DELAY_MS: numberFromEnv(4000).pipe(z.number().int().min(0)),
 });
 

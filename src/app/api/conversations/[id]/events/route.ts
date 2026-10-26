@@ -6,6 +6,8 @@ import { sseResponse } from "@/server/http/sse";
 import { ensureStarted } from "@/server/startup";
 
 export const dynamic = "force-dynamic";
+// Conexão SSE longa; ao atingir o limite da plataforma o navegador reconecta sozinho.
+export const maxDuration = 300;
 
 /** Eventos de uma conversa: o analista vê qualquer uma; o funcionário só a própria. */
 export async function GET(request: Request, context: RouteContext<"/api/conversations/[id]/events">) {

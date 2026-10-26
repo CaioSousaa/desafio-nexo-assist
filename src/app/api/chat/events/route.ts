@@ -5,6 +5,8 @@ import { sseResponse } from "@/server/http/sse";
 import { ensureStarted } from "@/server/startup";
 
 export const dynamic = "force-dynamic";
+// Conexão SSE longa; ao atingir o limite da plataforma o navegador reconecta sozinho.
+export const maxDuration = 300;
 
 /** Eventos do chat do funcionário: canal por funcionário, cobre a troca para uma conversa nova. */
 export async function GET(request: Request) {

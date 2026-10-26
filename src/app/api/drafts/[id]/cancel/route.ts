@@ -3,6 +3,9 @@ import { cancelDraft } from "@/server/drafts/service";
 import { handle, ok } from "@/server/http/respond";
 import { ensureStarted } from "@/server/startup";
 
+// Pode chamar o modelo para resumir a conversa.
+export const maxDuration = 120;
+
 export async function POST(request: Request, context: RouteContext<"/api/drafts/[id]/cancel">) {
   return handle(async () => {
     const ctx = await ensureStarted();

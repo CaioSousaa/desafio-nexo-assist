@@ -4,11 +4,14 @@ import { authenticate, EMAIL_NOT_FOUND_MESSAGE, sessionCookie, signSession } fro
 import { findUserByEmail, publicUser } from "@/server/auth/users";
 import { fail, handle, readJson } from "@/server/http/respond";
 import { loginInput } from "@/server/http/schemas";
+import { clientIp, limits } from "@/server/http/rate-limit";
 import { ensureStarted } from "@/server/startup";
 
 export async function POST(request: Request) {
   return handle(async () => {
     const ctx = await ensureStarted();
+    const rate = limits().requests.hit(`login:${clientIp(request)}`, getEnv().RATE_LIMIT_LOGINS_PER_IP, 60_000);
+    if (!rate.ok) return fail("rate_limited", `Muitas tentativas de login. Tente de novo em ${rate.retryAfterS} s.`, 429);
     const input = loginInput.parse(await readJson(request));
     const result = await authenticate((email) => findUserByEmail(ctx.db, email), input.email, input.password);
     if (!result.ok) {

@@ -43,6 +43,24 @@ Qualquer senha não vazia funciona (a autenticação é simulada).
 3. Em outra janela anônima, entre como Rafael: a conversa da Ana aparece em **Para você** com o resumo da transferência. Assuma, responda, devolva ao agent ou encerre; o chat da Ana muda sozinho.
 4. Casos de borda: `TICKETS_OUTAGE_RATE=1` no `.env` faz o serviço de chamados falhar (o "Confirmar" avisa e o rascunho continua pendente); `AGENT_MESSAGE_LIMIT=3` mostra o limite de mensagens e o "Continuar em nova conversa".
 
+## Deploy na Vercel (demonstração)
+
+Versão online: _link na seção abaixo após o deploy_.
+
+Proteções pedidas para o deploy público:
+
+- **Chaves na plataforma**: `GEMINI_API_KEY` e `SESSION_SECRET` ficam só nas variáveis de ambiente da Vercel, nunca no código nem no repositório.
+- **Limite de uso por IP**: até 30 mensagens ao agent a cada 10 minutos e 10 tentativas de login por minuto por IP (`RATE_LIMIT_MESSAGES_PER_IP`, `RATE_LIMIT_LOGINS_PER_IP`); acima disso a API responde 429 com o tempo de espera.
+- **Teto diário de uso do modelo**: até 500 respostas do agent por dia (`DAILY_TURN_LIMIT`), para a demonstração não esgotar a cota da chave.
+
+Limitações conscientes do modo demonstração (a arquitetura foi desenhada para um servidor só, decisões T3–T6):
+
+- O SQLite fica em `/tmp` da função: os dados voltam ao estado de exemplo quando a Vercel cria uma instância nova, e instâncias diferentes não compartilham dados. Para produção, o caminho é trocar o arquivo por um banco remoto (Turso usa o mesmo `@libsql/client`).
+- O tempo real usa SSE com barramento em memória; quando uma ação cai em outra instância, a tela se atualiza pela consulta periódica (a cada 8 s).
+- Os limites por IP e o teto diário valem por instância; para um limite global, configure uma regra de rate limit no Firewall da Vercel.
+
+Para publicar o seu: importe o repositório na Vercel, defina `GEMINI_API_KEY` e `SESSION_SECRET` (16+ caracteres) em *Environment Variables* e faça o deploy. O resto tem padrão.
+
 ## Arquitetura
 
 Um único projeto Next.js 16 (App Router) com interface, API e agent no mesmo processo, e dois bancos SQLite.
@@ -82,7 +100,7 @@ Cada mensagem vira um turno (`src/server/agent/run-turn.ts`):
 
 ### Testes automatizados (`npm test`)
 
-236 testes em Vitest, sem chamar o modelo. Os testes de integração usam bancos SQLite temporários com as migrations reais; os do turno usam o `Agent` do Mastra de verdade com um **modelo roteirizado** (`src/test/scripted-model.ts`), então ferramentas, `RequestContext`, streaming e pós-ações são exercitados de ponta a ponta.
+240 testes em Vitest, sem chamar o modelo. Os testes de integração usam bancos SQLite temporários com as migrations reais; os do turno usam o `Agent` do Mastra de verdade com um **modelo roteirizado** (`src/test/scripted-model.ts`), então ferramentas, `RequestContext`, streaming e pós-ações são exercitados de ponta a ponta.
 
 | Suíte | O que cobre |
 |-------|-------------|
@@ -136,11 +154,11 @@ Cada resposta grava tokens e custo estimado (tabela paga: US$ 0,30 entrada / US$
 ## Resetar dados e desfazer
 
 - `npm run db:reset` apaga `data/app.db` e `data/tickets.db`, migra e recarrega os dados de exemplo (`-- --keep-tickets` mantém os chamados).
-- `TICKETS_OUTAGE_RATE=0` desliga a indisponibilidade simulada; `AGENT_CONFIDENCE_THRESHOLD` muda o limiar da transferência por baixa confiança; `AGENT_MESSAGE_LIMIT` muda o limite por conversa; `AGENT_TURN_TIMEOUT_MS` (padrão 90 s) é o tempo máximo de uma resposta antes de virar "Tentar de novo".
+- `TICKETS_OUTAGE_RATE=0` desliga a indisponibilidade simulada; `RATE_LIMIT_MESSAGES_PER_IP`, `RATE_LIMIT_LOGINS_PER_IP` e `DAILY_TURN_LIMIT` ajustam (ou desligam com 0) as proteções de uso; `AGENT_CONFIDENCE_THRESHOLD` muda o limiar da transferência por baixa confiança; `AGENT_MESSAGE_LIMIT` muda o limite por conversa; `AGENT_TURN_TIMEOUT_MS` (padrão 90 s) é o tempo máximo de uma resposta antes de virar "Tentar de novo".
 
 ## O que eu faria com mais tempo
 
-- Deploy com proteção da chave e limite de uso por IP.
+- Banco remoto (Turso) e barramento de eventos compartilhado para o deploy deixar de ser só demonstração.
 - Testes de interface com Playwright (hoje a interface tem roteiro de QA manual) e testes das rotas HTTP.
 - Roteamento por nível (N1/N2) e calendário de feriados no cálculo de horas úteis.
 - Rodar a suíte de avaliação em CI a cada mudança de instruções, comparando com a execução anterior.
