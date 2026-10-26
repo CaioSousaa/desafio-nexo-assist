@@ -25,7 +25,7 @@ npm run dev               # http://localhost:3000
 
 Na primeira requisição o servidor cria os bancos em `data/`, aplica as migrations e carrega os dados de exemplo. Para voltar ao estado inicial: `npm run db:reset`.
 
-### Contas de exemplo
+### Contas de exemplo (local e online)
 
 Qualquer senha não vazia funciona (a autenticação é simulada).
 
@@ -43,23 +43,25 @@ Qualquer senha não vazia funciona (a autenticação é simulada).
 3. Em outra janela anônima, entre como Rafael: a conversa da Ana aparece em **Para você** com o resumo da transferência. Assuma, responda, devolva ao agent ou encerre; o chat da Ana muda sozinho.
 4. Casos de borda: `TICKETS_OUTAGE_RATE=1` no `.env` faz o serviço de chamados falhar (o "Confirmar" avisa e o rascunho continua pendente); `AGENT_MESSAGE_LIMIT=3` mostra o limite de mensagens e o "Continuar em nova conversa".
 
-## Deploy na Vercel (demonstração)
+## Versão online (Render)
 
-Versão online: _link na seção abaixo após o deploy_.
+**https://desafio-nexo-assist.onrender.com**: entre com as contas de exemplo (seção anterior) e qualquer senha.
 
-Proteções pedidas para o deploy público:
+Roda no plano gratuito do Render: um servidor Node só, com o SQLite em disco local e tempo real por SSE, exatamente a arquitetura do projeto. Limitações do plano gratuito:
 
-- **Chaves na plataforma**: `GEMINI_API_KEY` e `SESSION_SECRET` ficam só nas variáveis de ambiente da Vercel, nunca no código nem no repositório.
+- O serviço dorme após 15 minutos sem acesso; a primeira requisição depois disso leva cerca de 1 minuto.
+- O disco é efêmero: quando o serviço reinicia ou dorme, os dados voltam ao estado de exemplo.
+- As respostas do agent dependem da latência da API do Gemini no free tier (em horários de pico, dezenas de segundos por resposta). Por isso o serviço usa `AGENT_TURN_TIMEOUT_MS=180000`.
+
+Proteções do deploy público:
+
+- **Chaves na plataforma**: `GEMINI_API_KEY` e `SESSION_SECRET` ficam só nas variáveis de ambiente do Render, nunca no código nem no repositório.
 - **Limite de uso por IP**: até 30 mensagens ao agent a cada 10 minutos e 10 tentativas de login por minuto por IP (`RATE_LIMIT_MESSAGES_PER_IP`, `RATE_LIMIT_LOGINS_PER_IP`); acima disso a API responde 429 com o tempo de espera.
 - **Teto diário de uso do modelo**: até 500 respostas do agent por dia (`DAILY_TURN_LIMIT`), para a demonstração não esgotar a cota da chave.
 
-Limitações conscientes do modo demonstração (a arquitetura foi desenhada para um servidor só, decisões T3–T6):
+Para publicar o seu: crie um Web Service no Render a partir do repositório (ou use o `render.yaml` como Blueprint), plano Free, build `npm ci && npm run build`, start `npm start`, e defina `GEMINI_API_KEY` e `SESSION_SECRET` (16+ caracteres).
 
-- O SQLite fica em `/tmp` da função: os dados voltam ao estado de exemplo quando a Vercel cria uma instância nova, e instâncias diferentes não compartilham dados. Para produção, o caminho é trocar o arquivo por um banco remoto (Turso usa o mesmo `@libsql/client`).
-- O tempo real usa SSE com barramento em memória; quando uma ação cai em outra instância, a tela se atualiza pela consulta periódica (a cada 8 s).
-- Os limites por IP e o teto diário valem por instância; para um limite global, configure uma regra de rate limit no Firewall da Vercel.
-
-Para publicar o seu: importe o repositório na Vercel, defina `GEMINI_API_KEY` e `SESSION_SECRET` (16+ caracteres) em *Environment Variables* e faça o deploy. O resto tem padrão.
+**Por que não a Vercel**: o primeiro deploy foi na Vercel. Funções serverless distribuem requisições entre instâncias, e cada uma tinha o próprio SQLite em `/tmp` — a mensagem era gravada numa instância e a leitura seguinte caía em outra, sem dados. Para rodar lá seria preciso um banco remoto (Turso usa o mesmo `@libsql/client`) e um barramento de eventos compartilhado; o código já tem o que a Vercel exige (migrations empacotadas, `maxDuration`, consulta periódica de reserva), mas o deploy válido é o do Render.
 
 ## Arquitetura
 

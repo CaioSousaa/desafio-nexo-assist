@@ -1,0 +1,19 @@
+# Blueprint do Render: um Web Service gratuito com o projeto inteiro (interface, API, agent e SQLite local).
+services:
+  - type: web
+    name: desafio-nexo-assist
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: AGENT_TURN_TIMEOUT_MS
+        value: "180000"
