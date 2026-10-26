@@ -1,0 +1,6 @@
+node_modules
+.next
+data
+drizzle
+eval/report.md
+package-lock.json
