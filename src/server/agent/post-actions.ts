@@ -2,7 +2,7 @@ import { closeAsResolved } from "../conversations/service";
 import { findConversation, updateConversation, type Conversation } from "../conversations/repo";
 import type { TransferInput } from "../conversations/transfer";
 import type { AppContext } from "../context";
-import { findPendingDraft, transitionDraft } from "../drafts/repo";
+import { findDraft, findPendingDraft, transitionDraft } from "../drafts/repo";
 import { applyLimitIfReached } from "../conversations/limit";
 import { logger } from "../logger";
 import type { TurnScratch } from "./tools/context";
@@ -51,7 +51,23 @@ export async function runPostActions(
     if (transferred) return ["transferred_low_confidence"];
   }
 
-  const request = input.scratch.transferRequest;
+  // FR-044: rascunho Crítica sempre leva à transferência, mesmo que o modelo esqueça de pedir.
+  let request = input.scratch.transferRequest;
+  if (!request && input.scratch.draftId) {
+    const draft = await findDraft(ctx.db, input.scratch.draftId);
+    if (draft?.status === "aguardando_confirmacao" && (draft.payload.newPriority ?? draft.payload.priority) === "Crítica") {
+      logger.warn("critical_transfer_enforced", { conversationId: conversation.id, draftId: draft.id });
+      request = {
+        reason: "critico",
+        summary: {
+          problem: draft.payload.title,
+          done: `Montou o rascunho ${draft.displayCode} com prioridade Crítica.`,
+          tickets: draft.payload.targetTicket ? [draft.payload.targetTicket] : [],
+          priority: "Crítica",
+        },
+      };
+    }
+  }
   if (request) {
     const pending = await findPendingDraft(ctx.db, conversation.id);
     if (pending && request.reason === "critico") {

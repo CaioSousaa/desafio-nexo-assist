@@ -92,6 +92,19 @@ describe("pós-ações do turno", () => {
     expect((await findPendingDraft(app.ctx.db, conversation.id))?.transferAfterDecision).toBe(true);
   });
 
+  it("rascunho Crítica sem request_transfer: o servidor agenda a transferência crítica mesmo assim (FR-044)", async () => {
+    const conversation = await open();
+    const { draft } = await addDraft(conversation.id);
+    const scratch = createTurnScratch();
+    scratch.draftId = draft.id;
+    const transfer = vi.fn();
+    expect(await runPostActions(app.ctx, { conversationId: conversation.id, scratch, confidence: 90 }, { transfer })).toEqual(["transfer_pending_draft"]);
+    const fresh = await findConversation(app.ctx.db, conversation.id);
+    expect(fresh).toMatchObject({ pendingTransfer: true, transferReason: "critico" });
+    expect(fresh?.transferSummary?.problem).toBe("Rede do andar caiu");
+    expect((await findPendingDraft(app.ctx.db, conversation.id))?.transferAfterDecision).toBe(true);
+  });
+
   it("contador no limite: mensagem de limite com opções e limit_reached", async () => {
     const conversation = await open();
     await updateConversation(app.ctx.db, conversation.id, { agentMessageCount: 30 });
