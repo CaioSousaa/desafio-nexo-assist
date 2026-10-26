@@ -34,7 +34,11 @@ export async function createContextFromEnv(): Promise<AppContext> {
     ticketsDbPath: env.TICKETS_DB_PATH,
     model: [{ model: { id: modelId, apiKey: env.GEMINI_API_KEY }, maxRetries: 3 }],
     modelName: env.GEMINI_MODEL,
-    config: { confidenceThreshold: env.AGENT_CONFIDENCE_THRESHOLD, messageLimit: env.AGENT_MESSAGE_LIMIT },
+    config: {
+      confidenceThreshold: env.AGENT_CONFIDENCE_THRESHOLD,
+      messageLimit: env.AGENT_MESSAGE_LIMIT,
+      turnTimeoutMs: env.AGENT_TURN_TIMEOUT_MS,
+    },
     outage: { rate: env.TICKETS_OUTAGE_RATE, seconds: env.TICKETS_OUTAGE_SECONDS },
     bus: getBus(),
   });

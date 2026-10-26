@@ -29,7 +29,22 @@ export const TURN_OPTIONS = {
   providerOptions: { google: { thinkingConfig: { thinkingLevel: "low" } } },
 } as const;
 
-const TURN_TIMEOUT_MS = 45_000;
+export const DEFAULT_TURN_TIMEOUT_MS = 90_000;
+
+interface StepLike {
+  text?: string;
+  toolCalls?: Array<{ toolName?: string; payload?: { toolName?: string } }>;
+}
+
+/**
+ * Encerra o loop quando o modelo já escreveu o texto final e registrou a decisão no mesmo passo:
+ * evita uma ida extra ao modelo só para "fechar" o turno (cada ida custa latência e tokens).
+ */
+export function stopAfterDecisionWithText({ steps }: { steps: StepLike[] }): boolean {
+  const last = steps.at(-1);
+  if (!last?.text?.trim()) return false;
+  return (last.toolCalls ?? []).some((call) => (call.toolName ?? call.payload?.toolName) === "record_decision");
+}
 
 export function createNexoAgent(model: AgentModel): Agent {
   const agent = new Agent({
@@ -45,13 +60,13 @@ export function createNexoAgent(model: AgentModel): Agent {
   return agent;
 }
 
-function withTimeout(signal: AbortSignal | undefined): AbortSignal {
-  const timeout = AbortSignal.timeout(TURN_TIMEOUT_MS);
-  return signal ? AbortSignal.any([signal, timeout]) : timeout;
-}
-
-export function createAgentRunner(model: AgentModel, modelName: string): AgentRunner {
+export function createAgentRunner(model: AgentModel, modelName: string, options: { turnTimeoutMs?: number } = {}): AgentRunner {
   const agent = createNexoAgent(model);
+  const timeoutMs = options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS;
+  const withTimeout = (signal: AbortSignal | undefined): AbortSignal => {
+    const timeout = AbortSignal.timeout(timeoutMs);
+    return signal ? AbortSignal.any([signal, timeout]) : timeout;
+  };
   return {
     modelName,
     async stream(history, { requestContext, abortSignal }) {
@@ -59,6 +74,7 @@ export function createAgentRunner(model: AgentModel, modelName: string): AgentRu
         requestContext,
         toolChoice: "auto",
         abortSignal: withTimeout(abortSignal),
+        stopWhen: stopAfterDecisionWithText as never,
         ...TURN_OPTIONS,
       });
       return {

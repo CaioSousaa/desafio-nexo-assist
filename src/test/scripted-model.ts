@@ -5,7 +5,7 @@ export type ModelStep =
   | { tools?: Array<{ name: string; args: Record<string, unknown> }>; text?: string; error?: undefined }
   | { error: Error };
 
-export type ScriptEntry = ModelStep | ((prompt: unknown) => ModelStep | Promise<ModelStep>);
+export type ScriptEntry = ModelStep | ((prompt: unknown, abortSignal?: AbortSignal) => ModelStep | Promise<ModelStep>);
 
 const usage = { inputTokens: 1200, outputTokens: 80, totalTokens: 1280 };
 
@@ -45,7 +45,7 @@ export class ScriptedModel {
         this.toolChoices.push(options.toolChoice);
         const entry = this.queue.shift();
         if (!entry) throw new Error("ScriptedModel: roteiro vazio (o turno chamou o modelo mais vezes que o esperado)");
-        const step = typeof entry === "function" ? await entry(options.prompt) : entry;
+        const step = typeof entry === "function" ? await entry(options.prompt, options.abortSignal) : entry;
         if (step.error) throw step.error;
         const chunks: unknown[] = [{ type: "stream-start", warnings: [] }];
         for (const tool of step.tools ?? []) {

@@ -12,6 +12,8 @@ export interface AppConfig {
   confidenceThreshold: number;
   /** Mensagens do funcionário ao agent por conversa (FR-070). */
   messageLimit: number;
+  /** Tempo máximo de um turno do agent; estourou, vira erro com "Tentar de novo". */
+  turnTimeoutMs: number;
 }
 
 /** Raiz de composição: tudo que um turno, uma rota ou um teste precisa, sem singletons escondidos. */
@@ -40,10 +42,11 @@ export interface CreateAppContextOptions {
   bus?: EventBus;
 }
 
-export const DEFAULT_CONFIG: AppConfig = { confidenceThreshold: 60, messageLimit: 30 };
+export const DEFAULT_CONFIG: AppConfig = { confidenceThreshold: 60, messageLimit: 30, turnTimeoutMs: 90_000 };
 
 export async function createAppContext(options: CreateAppContextOptions): Promise<AppContext> {
   const now = options.now ?? (() => new Date());
+  const config: AppConfig = { ...DEFAULT_CONFIG, ...options.config };
   const app: SqliteHandle<AppDb> = await createAppDb(options.appDbPath);
   await migrateDb(app.db, "app");
   const tickets = await openTicketModule(options.ticketsDbPath, {
@@ -56,9 +59,9 @@ export async function createAppContext(options: CreateAppContextOptions): Promis
     tickets: tickets.service,
     ticketsLocal: tickets.local,
     bus: options.bus ?? new EventBus(),
-    config: { ...DEFAULT_CONFIG, ...options.config },
+    config,
     now,
-    agent: createAgentRunner(options.model, options.modelName),
+    agent: createAgentRunner(options.model, options.modelName, { turnTimeoutMs: config.turnTimeoutMs }),
     summarizer: options.summarizer ?? createModelSummarizer(options.model),
     close() {
       app.close();

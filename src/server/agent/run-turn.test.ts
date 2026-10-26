@@ -6,7 +6,8 @@ import { takeConversation } from "../conversations/console-actions";
 import { findDecisionsByMessageIds, listDecisions } from "../decisions/repo";
 import { findPendingDraft } from "../drafts/repo";
 import { listMessages } from "../messages/repo";
-import { acceptEmployeeMessage, FALLBACK_RATIONALE, LimitReachedError, MODEL_ERROR_TEXT, retryAgentMessage } from "./run-turn";
+import { stopAfterDecisionWithText } from "./agent";
+import { acceptEmployeeMessage, FALLBACK_RATIONALE, LimitReachedError, MODEL_ERROR_TEXT, retryAgentMessage, TIMEOUT_TEXT } from "./run-turn";
 
 let app: TestApp;
 beforeEach(async () => {
@@ -125,6 +126,45 @@ describe("turno do agent (Mastra + ferramentas + banco, modelo roteirizado)", ()
     expect(messages.find((m) => m.id === agent.id)).toMatchObject({ status: "done", text: "Agora foi." });
     expect((await findConversation(app.ctx.db, accepted.conversation.id))?.agentMessageCount).toBe(1);
     await expect(retryAgentMessage(app.ctx, employee, agent.id)).rejects.toMatchObject({ code: "not_failed" });
+  });
+
+  it("texto final e record_decision no mesmo passo: uma única chamada ao modelo", async () => {
+    app.model.push({ tools: [decision({ action: "responder_central" })], text: "Atendemos das 8h às 18h." });
+    const accepted = await send("horário?");
+    expect(app.model.prompts).toHaveLength(1);
+    expect(app.model.remaining).toBe(0);
+    const reply = (await listMessages(app.ctx.db, accepted.conversation.id)).at(-1)!;
+    expect(reply).toMatchObject({ status: "done", text: "Atendemos das 8h às 18h." });
+  });
+
+  it("stopAfterDecisionWithText só para com texto e record_decision no último passo", () => {
+    const decisionCall = { toolName: "record_decision" };
+    expect(stopAfterDecisionWithText({ steps: [{ text: "oi", toolCalls: [decisionCall] }] })).toBe(true);
+    expect(stopAfterDecisionWithText({ steps: [{ text: "", toolCalls: [decisionCall] }] })).toBe(false);
+    expect(stopAfterDecisionWithText({ steps: [{ text: "oi", toolCalls: [{ toolName: "list_my_tickets" }] }] })).toBe(false);
+    expect(stopAfterDecisionWithText({ steps: [{ text: "oi", toolCalls: [{ payload: { toolName: "record_decision" } }] }] })).toBe(true);
+  });
+
+  it("modelo lento além do tempo limite: erro com 'Tentar de novo', sem decisão de reserva nem transferência", async () => {
+    const slow = await createTestApp({ config: { turnTimeoutMs: 300 } });
+    try {
+      slow.model.push(
+        (_prompt, signal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+          }),
+      );
+      const ana = await slow.user(ANA);
+      const accepted = await acceptEmployeeMessage(slow.ctx, ana, { text: "oi", clientMessageId: clientId() });
+      await accepted.run?.();
+      const reply = (await listMessages(slow.ctx.db, accepted.conversation.id)).find((m) => m.id === accepted.agentMessage!.id)!;
+      expect(reply).toMatchObject({ status: "error", text: TIMEOUT_TEXT });
+      const conversation = await findConversation(slow.ctx.db, accepted.conversation.id);
+      expect(conversation?.state).toBe("com_agent");
+      expect(await listDecisions(slow.ctx.db, accepted.conversation.id)).toEqual([]);
+    } finally {
+      slow.close();
+    }
   });
 
   it("com a conversa aguardando atendente o agent não responde; a mensagem fica registrada (FR-042)", async () => {

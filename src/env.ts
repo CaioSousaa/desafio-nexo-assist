@@ -32,6 +32,7 @@ export const envSchema = z.object({
     .min(16, "obrigatória, com pelo menos 16 caracteres"),
   AGENT_CONFIDENCE_THRESHOLD: numberFromEnv(60).pipe(z.number().min(0).max(100)),
   AGENT_MESSAGE_LIMIT: numberFromEnv(30).pipe(z.number().int().min(1)),
+  AGENT_TURN_TIMEOUT_MS: numberFromEnv(90_000).pipe(z.number().int().min(1_000)),
   TICKETS_OUTAGE_RATE: numberFromEnv(0.1).pipe(z.number().min(0).max(1)),
   TICKETS_OUTAGE_SECONDS: numberFromEnv(4).pipe(z.number().min(0)),
   APP_DB_PATH: textWithDefault("./data/app.db"),

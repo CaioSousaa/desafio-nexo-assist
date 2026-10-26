@@ -122,6 +122,12 @@ describe("consumeAgentStream", () => {
     expect(withFinish.error).toBeInstanceOf(Error);
   });
 
+  it("chunk 'abort' (tempo esgotado) vira erro, nunca resposta vazia sem decisão", async () => {
+    const { sink } = collect();
+    const result = await consumeAgentStream(chunks([{ type: "start" }, { type: "abort", payload: {} }, finish("stop")]), sink);
+    expect((result.error as Error).message).toMatch(/tempo esgotado/);
+  });
+
   it("exceção no meio do stream é capturada com o texto parcial", async () => {
     const { sink } = collect();
     async function* broken() {

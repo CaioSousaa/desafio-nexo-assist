@@ -20,6 +20,7 @@ import { recordDecisionInput, type RecordDecisionInput } from "./tools/record-de
 
 export const INTERRUPTED_TEXT = "A resposta foi interrompida. Tente de novo.";
 export const MODEL_ERROR_TEXT = "Não consegui responder agora.";
+export const TIMEOUT_TEXT = "O modelo demorou demais para responder.";
 export const FALLBACK_RATIONALE = "O agent não registrou a decisão; transferido por segurança.";
 
 export class LimitReachedError extends HttpError {
@@ -244,12 +245,14 @@ export async function runAgentTurn(
     log.info("turn_finished", { outcomes, durationMs: Date.now() - startedAt, firstSignalMs: result.firstSignalMs });
   } catch (error) {
     log.error("turn_failed", { error });
+    const reason = error instanceof Error ? error.message : String(error);
+    const timedOut = /tempo esgotado|abort|timeout/i.test(reason);
     const failed = await updateMessage(ctx.db, input.agentMessageId, {
       status: "error",
-      text: MODEL_ERROR_TEXT,
-      parts: { error_reason: error instanceof Error ? error.message.slice(0, 200) : "erro desconhecido" },
+      text: timedOut ? TIMEOUT_TEXT : MODEL_ERROR_TEXT,
+      parts: { error_reason: reason.slice(0, 200) },
     });
     publish("message", { message: failed });
-    publish("error", { messageId: input.agentMessageId, reason: MODEL_ERROR_TEXT });
+    publish("error", { messageId: input.agentMessageId, reason: timedOut ? TIMEOUT_TEXT : MODEL_ERROR_TEXT });
   }
 }

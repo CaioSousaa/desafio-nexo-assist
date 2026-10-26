@@ -144,6 +144,10 @@ export async function consumeAgentStream(
         case "error":
           error = payload.error ?? new Error("falha no modelo");
           break;
+        case "abort":
+          // Tempo esgotado ou cancelamento: é falha do turno, nunca "decisão ausente".
+          error ??= new Error("tempo esgotado esperando o modelo");
+          break;
         case "finish": {
           const stepResult = asRecord(payload.stepResult);
           finishReason = typeof stepResult.reason === "string" ? stepResult.reason : "stop";
